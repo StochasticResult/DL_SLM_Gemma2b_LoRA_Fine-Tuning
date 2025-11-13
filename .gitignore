@@ -1,0 +1,22 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Training artifacts and large model files
+outputs/
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.ckpt
+*.log
+
+# Environment artifacts
+.env
+.venv/
+env/
+venv/
+

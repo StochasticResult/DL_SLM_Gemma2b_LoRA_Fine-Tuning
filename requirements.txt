@@ -1,0 +1,15 @@
+# Install the CUDA-enabled PyTorch build separately:
+# pip install torch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 --index-url https://download.pytorch.org/whl/cu121
+
+transformers==4.44.0
+datasets==2.19.0
+accelerate==0.34.0
+peft==0.10.0
+trl==0.9.6
+bitsandbytes==0.43.1
+numpy==1.26.4
+scipy==1.11.4
+sentencepiece
+protobuf==4.25.3
+huggingface_hub
+
