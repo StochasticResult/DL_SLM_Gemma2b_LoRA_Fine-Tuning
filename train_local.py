@@ -37,7 +37,7 @@ except Exception:
     HAS_PYNVML = False
 
 # Hugging Face access token (required for gated models)
-HF_TOKEN = "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"
+HF_TOKEN = os.environ.get("HF_TOKEN", "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")
 if HF_TOKEN:
     login(token=HF_TOKEN)
 
@@ -152,7 +152,7 @@ class TrainingMonitorCallback(TrainerCallback):
 # === Configuration ===
 MODEL_NAME = "google/gemma-2-2b"  # Switch to "google/gemma-2-2b-it" if VRAM is tight
 DATASET_NAME = "databricks/databricks-dolly-15k"
-OUTPUT_DIR = "./outputs/gemma2-lora-dolly-epoch1"  # Continue training into this directory
+OUTPUT_DIR = "./outputs/gemma2-lora-dolly-fp16"  # New FP16 run output directory
 MAX_LEN = 512  # Increase to 768 or 1024 if the GPU permits
 EPOCHS = 2.0  # Resume for one additional epoch (total ≈2)
 BATCH_SIZE = 1
@@ -165,6 +165,8 @@ MONITOR_LOG_PATH = os.path.join(OUTPUT_DIR, "logs", "monitor_log.jsonl")
 
 # Disable BF16 and prefer FP16 to avoid dtype conversions on unsupported GPUs
 USE_BF16 = False  # torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+# Enable/disable 4-bit quantisation
+USE_4BIT = False
 
 # Validate GPU availability
 if not torch.cuda.is_available():
@@ -187,29 +189,38 @@ tok = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True, token=HF_TOKEN)
 if tok.pad_token is None:
     tok.pad_token = tok.eos_token
 
-# === Quantisation configuration (to save VRAM) ===
-# bitsandbytes may fail on Windows; we fall back to non-quantised loading if required
+# === Quantisation / precision configuration ===
 print("[2/7] Loading base model...")
-try:
-    # Attempt 4-bit quantisation
-    bnb_cfg = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.bfloat16 if USE_BF16 else torch.float16,
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_quant_type="nf4",
-    )
-    print("   Attempting 4-bit quantisation...")
-    base = AutoModelForCausalLM.from_pretrained(
-        MODEL_NAME,
-        quantization_config=bnb_cfg,
-        device_map="auto",
-        token=HF_TOKEN,
-        attn_implementation="eager",  # Force eager attention kernels
-    )
-    print("[OK] Loaded base model with 4-bit quantisation")
-except Exception as e:  # pylint: disable=broad-except
-    print(f"[WARN] 4-bit quantisation failed: {e}")
-    print("   Falling back to non-quantised loading (requires more VRAM)...")
+if USE_4BIT:
+    try:
+        bnb_cfg = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.bfloat16 if USE_BF16 else torch.float16,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+        )
+        print("   Attempting 4-bit quantisation...")
+        base = AutoModelForCausalLM.from_pretrained(
+            MODEL_NAME,
+            quantization_config=bnb_cfg,
+            device_map="auto",
+            token=HF_TOKEN,
+            attn_implementation="eager",  # Force eager attention kernels
+        )
+        print("[OK] Loaded base model with 4-bit quantisation")
+    except Exception as e:  # pylint: disable=broad-except
+        print(f"[WARN] 4-bit quantisation failed: {e}")
+        print("   Falling back to non-quantised loading (requires more VRAM)...")
+        base = AutoModelForCausalLM.from_pretrained(
+            MODEL_NAME,
+            torch_dtype=torch.bfloat16 if USE_BF16 else torch.float16,
+            device_map="auto",
+            token=HF_TOKEN,
+            attn_implementation="eager",
+        )
+        print("[OK] Loaded base model in half precision (no quantisation)")
+else:
+    print("   Skipping 4-bit quantisation; loading base model in FP16...")
     base = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
         torch_dtype=torch.bfloat16 if USE_BF16 else torch.float16,
@@ -217,7 +228,7 @@ except Exception as e:  # pylint: disable=broad-except
         token=HF_TOKEN,
         attn_implementation="eager",
     )
-    print("[OK] Loaded base model in half precision (no quantisation)")
+    print("[OK] Loaded base model directly in FP16")
 base.config.pad_token_id = tok.pad_token_id
 base.config.use_cache = False
 
@@ -315,6 +326,7 @@ args = TrainingArguments(
     output_dir=OUTPUT_DIR,
     num_train_epochs=EPOCHS,  # Train for roughly two epochs
     per_device_train_batch_size=BATCH_SIZE,
+    per_device_eval_batch_size=1,
     gradient_accumulation_steps=GRAD_ACC,
     learning_rate=LR,
     max_grad_norm=1.0,
@@ -328,7 +340,7 @@ args = TrainingArguments(
     warmup_ratio=0.03,
     weight_decay=0.0,
     bf16=USE_BF16,
-    fp16=(not USE_BF16),
+    fp16=False,
     gradient_checkpointing=False,  # Disable to avoid dtype issues
     report_to="none",
     logging_dir=os.path.join(OUTPUT_DIR, "logs", "tensorboard"),
@@ -361,7 +373,7 @@ print(f"[DEBUG] Trainer ready (train batches: {len(train_dataset)}, eval batches
 # === Train ===
 print("[5/7] Starting training...\n")
 training_start = time.time()
-train_output = trainer.train(resume_from_checkpoint=True)
+train_output = trainer.train(resume_from_checkpoint=os.path.isdir(os.path.join(OUTPUT_DIR, "checkpoint-1")))
 training_end = time.time()
 
 # Persist training metrics
