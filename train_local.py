@@ -37,9 +37,10 @@ except Exception:
     HAS_PYNVML = False
 
 # Hugging Face access token (required for gated models)
-HF_TOKEN = os.environ.get("HF_TOKEN", "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")
-if HF_TOKEN:
-    login(token=HF_TOKEN)
+HF_TOKEN = os.environ.get("HF_TOKEN")
+if not HF_TOKEN:
+    raise SystemExit("HF_TOKEN environment variable is not set; please run `set HF_TOKEN=...` before training.")
+login(token=HF_TOKEN)
 
 
 class TrainingMonitorCallback(TrainerCallback):
