@@ -44,7 +44,14 @@
 - Typical log entries (key information only):
   - Multiple prints: `{'loss': 0.0, 'grad_norm': nan, 'learning_rate': ... , 'epoch': ...}`
   - Final statistics: `{'train_runtime': 31289.7552, 'train_samples_per_second': 0.72, 'train_steps_per_second': 0.09, 'train_loss': 0.0, 'epoch': 1.5}`
-  - Peak GPU memory: `Max GPU memory (GB): 7.395251274108887`
+- **Training Time**:
+  - Total runtime: **31,289.76 seconds** (~8.69 hours)
+  - Training steps: 2,814 steps (1.5 epochs)
+  - Steps per second: **0.09 steps/s**
+  - Samples per second: **0.72 samples/s**
+- **VRAM Memory Usage**:
+  - Peak GPU memory: **7.40 GB** (`Max GPU memory (GB): 7.395251274108887`)
+  - Memory allocation: Stable throughout training
 - From the logs, **training loss remained at 0.0 and grad_norm was consistently NaN**, indicating potential issues with label/loss calculation in the current configuration (e.g., labels not properly set, or loss masked out). Although the Trainer iterated normally, the model did not effectively update.
 
 #### Training Completion and Exception
@@ -79,10 +86,16 @@
   - Multiple occurrences: `{'loss': 0.0, 'grad_norm': nan, 'learning_rate': ... , 'epoch': ...}`
   - Final statistics:
     - `{'train_runtime': 21521.0671, 'train_samples_per_second': 1.046, 'train_steps_per_second': 0.131, 'train_loss': 0.0, 'epoch': 1.5}`
-    - **LoRA version trained faster than QLoRA (steps_per_second increased from ~0.09 to 0.13)**
-  - Peak GPU memory:
-    - `Max GPU memory (GB): 7.706127643585205`
-    - Slightly higher than QLoRA version, consistent with the expectation that "no quantization => slightly larger memory footprint".
+- **Training Time**:
+  - Total runtime: **21,521.07 seconds** (~5.98 hours)
+  - Training steps: 2,814 steps (1.5 epochs)
+  - Steps per second: **0.131 steps/s**
+  - Samples per second: **1.046 samples/s**
+  - **LoRA version trained faster than QLoRA (steps_per_second increased from ~0.09 to 0.13)**
+- **VRAM Memory Usage**:
+  - Peak GPU memory: **7.71 GB** (`Max GPU memory (GB): 7.706127643585205`)
+  - Memory allocation: Stable throughout training
+  - Slightly higher than QLoRA version, consistent with the expectation that "no quantization => slightly larger memory footprint".
 - Same as QLoRA version, **loss remained at 0.0 and grad_norm was NaN**, further indicating the issue lies in data/label or loss configuration, not the quantization/LoRA switch itself.
 
 #### Training Completion and Saving
@@ -102,13 +115,15 @@
 - **Output directories**:
   - QLoRA version: `./outputs/gemma2b-qlora-dolly`
   - LoRA version: `./outputs/gemma2b-lora-dolly`
-- **Training time** (from logs):
-  - QLoRA: ~31,290 seconds (~8.7 hours), steps/sec ≈ 0.09
-  - LoRA: ~21,521 seconds (~6 hours), steps/sec ≈ 0.13
+- **Training Time** (from logs):
+  - QLoRA: **31,289.76 seconds** (~8.69 hours), steps/sec ≈ 0.09
+  - LoRA: **21,521.07 seconds** (~5.98 hours), steps/sec ≈ 0.13
+  - **Speedup**: LoRA is ~1.45x faster than QLoRA
   - Indicates that under current hardware and configuration, **the non-quantized LoRA version is faster**.
-- **Memory usage**:
-  - QLoRA: Peak ~7.40 GB
-  - LoRA: Peak ~7.71 GB
+- **VRAM Memory Usage**:
+  - QLoRA: Peak **7.40 GB**
+  - LoRA: Peak **7.71 GB**
+  - **Memory difference**: LoRA uses ~4.2% more memory than QLoRA
   - As expected: **QLoRA saves memory but is slightly slower, LoRA uses slightly more memory but is faster**.
 - **Loss and gradient status (same for both runs)**:
   - `loss` always `0.0`
@@ -197,6 +212,14 @@ This file records the **configuration, process, exceptions, and final status** o
     - `[Step 10] VRAM: 4.20GB (Peak) | Speed: 0.64 it/s   Loss: 0.0035`
     - ...
     - `[Step 100] VRAM: 4.20GB (Peak) | Speed: 0.58 it/s  Loss: 0.0314`
+- **Training Time**:
+  - Total steps: 100
+  - Average speed: ~0.61 it/s (range: 0.58–0.64 it/s)
+  - **Estimated total training time: ~164 seconds (~2.7 minutes)**
+  - Note: This is a short profiling run; full training would require more steps
+- **VRAM Memory Usage**:
+  - Peak GPU memory: **4.20 GB** (consistent throughout training)
+  - Memory allocation: Stable, no memory leaks observed
 - Observations:
   - **Loss fluctuated in the range 0.00x ~ 0.5**, indicating noise prediction is learning normally;
   - Peak memory approximately **4.20 GB**, relatively lightweight for SD tasks;
@@ -232,6 +255,14 @@ This file records the **configuration, process, exceptions, and final status** o
     - `[Step 10] VRAM: 2.43GB (Peak) | Speed: 0.72 it/s   Loss: 0.0956`
     - ...
     - `[Step 100] VRAM: 2.43GB (Peak) | Speed: 0.65 it/s  Loss: 0.0576`
+- **Training Time**:
+  - Total steps: 100
+  - Average speed: ~0.69 it/s (range: 0.65–0.72 it/s)
+  - **Estimated total training time: ~145 seconds (~2.4 minutes)**
+  - Note: This is a short profiling run; full training would require more steps
+- **VRAM Memory Usage**:
+  - Peak GPU memory: **2.43 GB** (consistent throughout training)
+  - Memory allocation: Stable, no memory leaks observed
 - Observations:
   - Loss also fluctuated in the range 0.0x ~ 0.4+, learning is normal;
   - Peak memory approximately **2.43 GB**;
@@ -254,9 +285,13 @@ This file records the **configuration, process, exceptions, and final status** o
   - QLoRA: approximately **4.20 GB**
   - LoRA: approximately **2.43 GB**
   - Under this machine's environment, **standard LoRA actually uses less memory**, because the QLoRA path has additional k-bit training overhead (e.g., extra caching, preparation logic), and both only apply LoRA to the UNet portion.
+- **Training Time**:
+  - QLoRA: **~164 seconds** (~2.7 minutes) for 100 steps
+  - LoRA: **~145 seconds** (~2.4 minutes) for 100 steps
+  - **Speedup**: LoRA is ~1.13x faster than QLoRA for the same number of steps
 - **Training speed (steps/s)**:
-  - QLoRA: approximately **0.58–0.64 it/s**
-  - LoRA: approximately **0.65–0.72 it/s**
+  - QLoRA: approximately **0.58–0.64 it/s** (average ~0.61 it/s)
+  - LoRA: approximately **0.65–0.72 it/s** (average ~0.69 it/s)
   - LoRA is overall slightly faster, consistent with the intuition that "simpler operators, no quantization overhead".
 - **Loss curve (rough observation)**:
   - Both methods' loss fluctuated around 0.0x ~ 0.5, no obvious convergence difference visible within 100 steps;
@@ -266,3 +301,40 @@ Overall conclusions:
 - Under this GPU + current implementation, **"QLoRA vs LoRA" for Stable Diffusion is more of a demonstration of performance/memory trade-offs**;
 - From a pure resource perspective, LoRA (no quantization) in this experiment is both more memory-efficient and faster;
 - If future serious comparison of generation quality is desired, it is necessary to generate the same set of prompts with base vs QLoRA vs LoRA under the same number of steps, then perform subjective or quantitative evaluation.
+
+---
+
+## Summary Table: All Training Results
+
+### Gemma-2-2B Model Training Results
+
+| Configuration | Training Time | VRAM Usage | Training Speed | Steps | Epochs | Output Directory |
+|---------------|---------------|------------|----------------|-------|--------|------------------|
+| **QLoRA** (4-bit + LoRA) | 31,289.76 sec (~8.69 hours) | 7.40 GB (peak) | 0.09 steps/s | 2,814 | 1.5 | `./outputs/gemma2b-qlora-dolly` |
+| **LoRA** (no quantization) | 21,521.07 sec (~5.98 hours) | 7.71 GB (peak) | 0.131 steps/s | 2,814 | 1.5 | `./outputs/gemma2b-lora-dolly` |
+| **Speedup** | LoRA is **1.45x faster** | LoRA uses **4.2% more VRAM** | LoRA is **1.46x faster** | Same | Same | - |
+
+### Stable Diffusion Model Training Results
+
+| Configuration | Training Time | VRAM Usage | Training Speed | Steps | Output Directory |
+|---------------|---------------|------------|----------------|-------|------------------|
+| **QLoRA** (4-bit + LoRA) | ~164 sec (~2.7 min) | 4.20 GB (peak) | 0.58-0.64 it/s (avg ~0.61) | 100 | `./sd-vangogh-qlora` |
+| **LoRA** (no quantization) | ~145 sec (~2.4 min) | 2.43 GB (peak) | 0.65-0.72 it/s (avg ~0.69) | 100 | `./sd-vangogh-lora` |
+| **Speedup** | LoRA is **1.13x faster** | LoRA uses **42% less VRAM** | LoRA is **1.13x faster** | Same | - |
+
+### Key Observations
+
+1. **Gemma-2-2B**: 
+   - QLoRA saves ~4% VRAM but is ~45% slower
+   - LoRA uses slightly more VRAM but is significantly faster
+   - Both configurations show loss=0.0 issue (needs investigation)
+
+2. **Stable Diffusion**:
+   - Counter-intuitively, LoRA uses **less** VRAM than QLoRA (likely due to quantization overhead)
+   - LoRA is faster and more memory-efficient for this specific implementation
+   - Both show normal loss curves (0.0x ~ 0.5 range)
+
+3. **General Pattern**:
+   - Quantization overhead can sometimes outweigh memory savings
+   - Actual performance depends on hardware, model size, and implementation details
+   - For small models or short training runs, standard LoRA may be preferable
