@@ -1,0 +1,6 @@
+=== Gemma-2-2B + LoRA (Epoch 1) Chat Test ===
+Adapter: ./outputs/gemma2-lora-dolly-epoch1\lora_adapter
+Model loaded successfully.
+
+User: Hello, who are you?
+--------------------
