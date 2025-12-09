@@ -64,3 +64,4 @@ except Exception as e:
     print(f"Error generating image: {e}")
     sys.exit(1)
 
+
